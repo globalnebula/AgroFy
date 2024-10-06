@@ -5,6 +5,15 @@ import numpy as np
 import cv2
 from PIL import Image
 import io
+from groq import Groq
+
+
+groq_api_key = "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" 
+
+# Initialize Groq client
+def initialize_groq_client(api_key):
+    client = Groq(api_key=api_key)
+    return client
 
 # Function to fetch precipitation and temperature data from OpenWeatherMap API
 def fetch_weather_data(api_key, location):
@@ -39,6 +48,37 @@ def process_ndvi_image(image):
 
     return binary_ndvi
 
+# Function to interact with Groq AI for agriculture-related queries
+def fetch_agriculture_advice(user_query, client, location):
+    openweather_api_key = "8b7d1ed40b332b731beb9ee190eab6d9"
+    precipitation, temperature = fetch_weather_data(openweather_api_key, location)
+    context = f"The current precipitation is {precipitation} mm and the temperature is {temperature} °C. at {location}"
+    query = f"{user_query} in context of the the conditions {context}."
+    completion = client.chat.completions.create(
+        model="llama3-8b-8192",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are an AI assistant designed to support farmers by providing accurate and timely information related to agriculture. You understand various aspects of farming, including crop management, soil health, weather forecasting, pest control, irrigation techniques, market prices, government schemes, and modern farming technologies."
+            },
+            {
+                "role": "user",
+                "content": query
+            }
+        ],
+        temperature=1,
+        max_tokens=1024,
+        top_p=1,
+        stream=True,
+        stop=None,
+    )
+
+    response = ""
+    for chunk in completion:
+        response += chunk.choices[0].delta.content or ""
+    
+    return response
+
 # Title of the app
 st.title("Farming Challenges: Gamified NDVI Analysis")
 
@@ -49,9 +89,10 @@ if not username:
     st.sidebar.warning("Please enter a username to start!")
     st.stop()
 
-# API Keys (Replace with your actual keys)
 openweather_api_key = "8b7d1ed40b332b731beb9ee190eab6d9"
-nasa_api_key = "l2sBirrhdwr3rGdRht2ec7Y0jSli5c41HOcB1tSv"
+nasa_image_url = "https://lpdaac.usgs.gov/media/images/MOD13Q1_V6_28Jul2018_Brazil_Hero.original_dEF2JTV.jpg"
+
+client = initialize_groq_client(groq_api_key)
 
 # Game Variables
 if 'points' not in st.session_state:
@@ -67,7 +108,6 @@ if not location:
 
 # Fetch real data
 precipitation, temperature = fetch_weather_data(openweather_api_key, location)
-nasa_image_url = "https://lpdaac.usgs.gov/media/images/MOD13Q1_V6_28Jul2018_Brazil_Hero.original_dEF2JTV.jpg"  # Replace with actual image URL
 
 # Fetch NDVI image
 ndvi_image = fetch_ndvi_image(nasa_image_url)
@@ -131,6 +171,16 @@ st.subheader("Feedback on Your Analysis")
 feedback = st.text_area("Enter your feedback on the data:")
 if st.button("Submit Feedback"):
     st.success("Feedback submitted! Thank you for your insights.")
+
+# Agriculture Chatbot Section
+st.subheader("Ask an Agriculture Expert")
+query = st.text_input("Enter your agriculture-related query:")
+if st.button("Get Advice"):
+    if query:
+        advice = fetch_agriculture_advice(query, client, location)
+        st.write(f"Expert Advice: {advice}")
+    else:
+        st.warning("Please enter a query.")
 
 # Achievement Badges
 st.subheader("Achievements")
