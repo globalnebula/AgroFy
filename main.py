@@ -217,6 +217,31 @@ def process_ndvi_image(image):
 
     return binary_ndvi
 
+
+st.markdown("""
+    <style>
+    /* Adjust all headers globally */
+    h1 {
+        font-size: 40px;
+        color: #fff;
+        text-align: center;
+    }
+    h2 {
+        font-size: 30px;
+        color: #fff;
+    }
+    h3 {
+        font-size: 24px;
+        color: #fff;
+    }
+    p {
+        font-size: 18px;
+        color: #fff;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+
 # Title of the app
 st.title("Farming Challenges: Gamified NDVI Analysis and Agricultural Advice")
 
@@ -250,23 +275,50 @@ precipitation, temperature = fetch_weather_data(openweather_api_key, location)
 # Fetch NDVI image
 ndvi_image = fetch_ndvi_image(nasa_image_url)
 
+
+def calculate_area_in_m2(pixel_count, spatial_resolution):
+    # spatial_resolution is in meters, e.g., 250 meters per pixel
+    # Area of a pixel in square meters = spatial_resolution^2
+    pixel_area_m2 = spatial_resolution ** 2
+    total_area_m2 = pixel_count * pixel_area_m2
+    return total_area_m2
+
+def calculate_area_in_hectares(total_area_m2):
+    # 1 hectare = 10,000 square meters
+    total_area_hectares = total_area_m2 / 10_000
+    return total_area_hectares
+
+def calculate_area_in_sq_km(total_area_m2):
+    # 1 sq km = 1,000,000 square meters
+    total_area_km2 = total_area_m2 / 1_000_000
+    return total_area_km2
+
+# Display results in a more readable format
 if ndvi_image:
     st.image(ndvi_image, caption="Fetched NDVI Image from NASA", use_column_width=True)
 
-    # Process NDVI image
     processed_image = process_ndvi_image(ndvi_image)
-    
-    # Display processed image
     st.image(processed_image, caption="Processed NDVI Image", use_column_width=True)
-    
-    # Perform agricultural analysis
+
     healthy_areas = np.sum(processed_image > 0)  # Count healthy areas
     total_area = processed_image.size
     health_percentage = (healthy_areas / total_area) * 100
 
-    st.write(f"Healthy Vegetation Area: {healthy_areas} pixels")
-    st.write(f"Total Area: {total_area} pixels")
+    spatial_resolution = 250  # Example resolution
+
+    # Calculate the area in square meters, hectares, and square kilometers
+    healthy_area_m2 = calculate_area_in_m2(healthy_areas, spatial_resolution)
+    healthy_area_hectares = calculate_area_in_hectares(healthy_area_m2)
+    healthy_area_km2 = calculate_area_in_sq_km(healthy_area_m2)
+
+    st.write(f"Healthy Vegetation Area: {healthy_area_m2:,.2f} square meters")
+    st.write(f"Healthy Vegetation Area: {healthy_area_hectares:,.2f} hectares")
+    st.write(f"Healthy Vegetation Area: {healthy_area_km2:,.2f} square kilometers")
+
+    total_area_m2 = calculate_area_in_m2(total_area, spatial_resolution)
+    st.write(f"Total Area: {total_area_m2:,.2f} square meters")
     st.write(f"Percentage of Healthy Vegetation: {health_percentage:.2f}%")
+
     
     # Update points for completing the NDVI quest
     if st.button("Complete NDVI Quest"):
