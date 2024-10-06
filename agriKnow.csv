@@ -1,0 +1,15 @@
+Crop Name,Optimal Temperature Range (°C),Precipitation Requirements (mm),Soil Type,Climate Type,Growing Season,Irrigation Requirements,Suitable Regions,Crop Resistance,Notes
+Rice,20-30,1500-2000,Clay, Loam,Tropical, Subtropical,June-Nov,High,Southeast Asia, South America,Resistant to high humidity, but sensitive to cold,Rice requires flooded fields during the early stages of growth.
+Corn,18-27,600-1200,Loamy, Sandy Loam,Temperate, Tropical,April-Oct,Moderate,North America, China,Resistant to drought, but needs sufficient sunlight,Corn is grown in a variety of soil types but prefers well-drained soils.
+Wheat,10-25,400-800,Loamy, Clay Loam,Temperate,Oct-April,Low to Moderate,Europe, North America,Sensitive to excessive rain; resistant to low temps during the germination phase,Wheat is highly adaptive but performs best in cooler, drier climates.
+Millet,25-30,200-600,Sandy, Loamy,Arid, Semi-arid,June-Oct,Low,Africa, South Asia,Drought-resistant, but sensitive to waterlogging,Millet can be grown in poor soils and requires minimal water.
+Sorghum,25-35,300-600,Loam, Sandy Loam,Tropical, Arid,May-Oct,Low,Africa, India,Heat-tolerant, drought-resistant,Ideal for regions with unpredictable rainfall.
+Barley,12-18,300-400,Well-drained, Sandy Loam,Temperate,Sept-July,Moderate,Europe, North America,Resistant to cold, but sensitive to waterlogging,Barley is a hardy crop suited for poor soil and low precipitation.
+Soybeans,20-30,450-700,Loamy, Well-drained,Temperate, Tropical,April-Oct,Moderate,USA, Brazil,Drought-tolerant after establishment,Soybeans are nitrogen-fixing and improve soil fertility.
+Sugarcane,25-35,1500-2500,Fertile, Well-drained,Tropical, Subtropical,Oct-March,High,Brazil, India,Needs plenty of water and sunshine,Requires warm temperatures and high humidity for growth.
+Potatoes,15-20,400-700,Well-drained, Sandy Loam,Temperate,Mar-June,Low to Moderate,Europe, South America,Resistant to light frost but sensitive to prolonged drought,Potatoes prefer cooler temperatures, especially at night.
+Carrots,15-25,500-700,Loamy, Well-drained,Temperate,April-Oct,Moderate,Europe, North America,Sensitive to heat, resistant to cool temperatures,Carrots grow well in cooler climates with deep, loose soil.
+Cucumber,20-30,600-1000,Well-drained, Fertile Loam,Tropical, Temperate,Mar-July,Moderate,Asia, USA,Heat-tolerant, needs consistent moisture,Cucumber is sensitive to drought and water stress.
+Tomatoes,18-25,600-800,Well-drained, Fertile Loam,Temperate, Tropical,May-Sept,Moderate,USA, Mexico, Italy,Susceptible to fungal diseases in humid conditions,Tomatoes need a sunny location and consistent watering.
+Kale,5-15,300-500,Loamy, Well-drained,Temperate,Sept-Dec,Low,Europe, North America,Resistant to frost, grows well in cool weather,Kale thrives in cooler temperatures and is highly frost-resistant.
+Grapes,15-25,600-1000,Well-drained, Fertile Loam,Mediterranean,April-Aug,Moderate,Europe, USA,Drought-tolerant but sensitive to waterlogging,Grapes require warm, dry summers and mild winters for best growth.

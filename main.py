@@ -5,15 +5,184 @@ import numpy as np
 import cv2
 from PIL import Image
 import io
+from sentence_transformers import SentenceTransformer
+import faiss
 from groq import Groq
 
-
-groq_api_key = "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" 
+groq_api_key = "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"
 
 # Initialize Groq client
 def initialize_groq_client(api_key):
     client = Groq(api_key=api_key)
     return client
+
+import os
+import PyPDF2
+
+@st.cache_resource
+def load_knowledge_base_and_embeddings():
+    # Load the knowledge base (CSV file and PDF file)
+    csv_file_path = 'agriKnow.csv'
+    pdf_file_path = 'agriKnow.pdf'
+    
+    # Initialize DataFrame and PDF content
+    df = None
+    pdf_content = None
+
+    # Check if the CSV file exists
+    if os.path.exists(csv_file_path):
+        df = pd.read_csv(csv_file_path)
+        
+        # Create a 'content' column from existing columns, if required
+        df['content'] = df.apply(lambda row: f"{row['Crop Name']} - {row['Notes']}", axis=1)
+    else:
+        st.error("CSV file not found.")
+    
+    # Check if the PDF file exists
+    if os.path.exists(pdf_file_path):
+        # Extract text from the PDF file
+        pdf_content = extract_pdf_content(pdf_file_path)
+    else:
+        st.error("PDF file not found.")
+    
+    # Load embeddings (if DataFrame is not None)
+    if df is not None and 'content' in df.columns:
+        model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+        
+        # Create document embeddings
+        document_embeddings = model.encode(df['content'].tolist())
+        
+        # Build a FAISS index for fast retrieval
+        index = faiss.IndexFlatL2(document_embeddings.shape[1])  # L2 distance
+        index.add(np.array(document_embeddings))
+        
+        return df, index, model, pdf_content
+    
+    return df, None, None, pdf_content
+
+def extract_pdf_content(pdf_file_path):
+    """Extract text content from the PDF file."""
+    content = ""
+    with open(pdf_file_path, "rb") as file:
+        reader = PyPDF2.PdfReader(file)
+        for page in reader.pages:
+            content += page.extract_text() + "\n"
+    return content.strip()
+
+
+df, index, model, pdf_content = load_knowledge_base_and_embeddings()
+
+
+if pdf_content is not None:
+    st.markdown("### Knowledge Base PDF")
+    st.write("You can download the PDF knowledge base for RAG model [here](agriKnow.pdf).")
+
+
+def retrieve_documents(query, df, index, model, top_k=3):
+    query_embedding = model.encode([query])
+    
+    # Search in FAISS index
+    distances, indices = index.search(np.array(query_embedding), top_k)
+    
+    # Return the top_k documents
+    retrieved_docs = df.iloc[indices[0]]
+    
+    return retrieved_docs
+
+# Function to interact with Groq AI for agriculture-related queries
+def fetch_agriculture_advice(user_query, client, location):
+    openweather_api_key = "8b7d1ed40b332b731beb9ee190eab6d9"
+    precipitation, temperature = fetch_weather_data(openweather_api_key, location)
+    context = f"The current precipitation is {precipitation} mm and the temperature is {temperature} °C. at {location}"
+    query = f"{user_query} in context of the the conditions {context}."
+    completion = client.chat.completions.create(
+        model="llama3-8b-8192",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are an AI assistant designed to support farmers by providing accurate and timely information related to agriculture."
+            },
+            {
+                "role": "user",
+                "content": query
+            }
+        ],
+        temperature=1,
+        max_tokens=1024,
+        top_p=1,
+        stream=True,
+        stop=None,
+    )
+
+    response = ""
+    for chunk in completion:
+        response += chunk.choices[0].delta.content or ""
+    
+    return response
+
+# Function to interact with Groq AI (LLM) for a direct response
+def fetch_llm_answer(user_query, client):
+    completion = client.chat.completions.create(
+        model="llama3-8b-8192",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are an AI assistant designed to support farmers by providing accurate and timely information related to agriculture. You understand various aspects of farming, including crop management, soil health, weather forecasting, pest control, irrigation techniques, market prices, government schemes, and modern farming technologies."
+            },
+            {
+                "role": "user",
+                "content": user_query
+            }
+        ],
+        temperature=1,
+        max_tokens=512,
+        top_p=1,
+        stream=True,
+        stop=None,
+    )
+
+    llm_response = ""
+    for chunk in completion:
+        llm_response += chunk.choices[0].delta.content or ""
+    
+    return llm_response
+
+# Function to fetch Groq AI's answer after retrieving context with RAG
+def fetch_rag_answer(user_query, client, retrieved_docs):
+    # Combine retrieved documents as context
+    context = "\n\n".join(retrieved_docs['content'].tolist())
+    
+    completion = client.chat.completions.create(
+        model="llama3-8b-8192",
+        messages=[
+            {
+                "role": "system",
+                "content": f"You are an AI assistant designed to support farmers by providing accurate and timely information related to agriculture. You understand various aspects of farming, including crop management, soil health. Here is some relevant context for the user's query: {context}"
+            },
+            {
+                "role": "user",
+                "content": user_query
+            }
+        ],
+        temperature=1,
+        max_tokens=512,
+        top_p=1,
+        stream=True,
+        stop=None,
+    )
+
+    rag_response = ""
+    for chunk in completion:
+        rag_response += chunk.choices[0].delta.content or ""
+    
+    return rag_response
+
+# Fusion function: Combine LLM's and RAG's answers
+def fusion_response(llm_answer, rag_answer):
+    # Simple fusion strategy: Combine both responses
+    final_response = f"LLM Answer:\n{llm_answer}\n\nRAG-Enhanced Answer:\n{rag_answer}"
+    
+    return final_response
 
 # Function to fetch precipitation and temperature data from OpenWeatherMap API
 def fetch_weather_data(api_key, location):
@@ -27,7 +196,7 @@ def fetch_weather_data(api_key, location):
     else:
         return None, None
 
-# Function to fetch NDVI image from NASA
+
 def fetch_ndvi_image(nasa_image_url):
     response = requests.get(nasa_image_url)
     if response.status_code == 200:
@@ -48,39 +217,8 @@ def process_ndvi_image(image):
 
     return binary_ndvi
 
-# Function to interact with Groq AI for agriculture-related queries
-def fetch_agriculture_advice(user_query, client, location):
-    openweather_api_key = "8b7d1ed40b332b731beb9ee190eab6d9"
-    precipitation, temperature = fetch_weather_data(openweather_api_key, location)
-    context = f"The current precipitation is {precipitation} mm and the temperature is {temperature} °C. at {location}"
-    query = f"{user_query} in context of the the conditions {context}."
-    completion = client.chat.completions.create(
-        model="llama3-8b-8192",
-        messages=[
-            {
-                "role": "system",
-                "content": "You are an AI assistant designed to support farmers by providing accurate and timely information related to agriculture. You understand various aspects of farming, including crop management, soil health, weather forecasting, pest control, irrigation techniques, market prices, government schemes, and modern farming technologies."
-            },
-            {
-                "role": "user",
-                "content": query
-            }
-        ],
-        temperature=1,
-        max_tokens=1024,
-        top_p=1,
-        stream=True,
-        stop=None,
-    )
-
-    response = ""
-    for chunk in completion:
-        response += chunk.choices[0].delta.content or ""
-    
-    return response
-
 # Title of the app
-st.title("Farming Challenges: Gamified NDVI Analysis")
+st.title("Farming Challenges: Gamified NDVI Analysis and Agricultural Advice")
 
 # User profile
 st.sidebar.header("User Profile")
@@ -154,35 +292,28 @@ if ndvi_image:
             st.write("The temperature is ideal; you can plant a variety of crops including tomatoes and beans.")
         else:
             st.write("High temperatures suggest planting heat-resistant crops like cucumbers or peppers.")
-    else:
-        st.error("Failed to fetch weather data.")
+        
+        # LLM Query Interface
+        st.subheader("Ask Agriculture Questions")
+        query = st.text_area("Ask a question related to farming challenges or agricultural advice:")
 
-else:
-    st.error("Failed to fetch NDVI image.")
+        openweather_api_key = "8b7d1ed40b332b731beb9ee190eab6d9"
+        precipitation, temperature = fetch_weather_data(openweather_api_key, location)
+        context = f"The current precipitation is {precipitation} mm and the temperature is {temperature} °C. at {location}"
+        user_query = f"{query} in context of the the conditions {context}."
 
-# Sidebar for showing points and completed quests
-st.sidebar.write(f"Points: {st.session_state.points}")
-st.sidebar.write("Quests Completed:")
-for quest in st.session_state.quests_completed:
-    st.sidebar.write(f"- {quest}")
 
-# Feedback Section
-st.subheader("Feedback on Your Analysis")
-feedback = st.text_area("Enter your feedback on the data:")
-if st.button("Submit Feedback"):
-    st.success("Feedback submitted! Thank you for your insights.")
-
-# Agriculture Chatbot Section
-st.subheader("Ask an Agriculture Expert")
-query = st.text_input("Enter your agriculture-related query:")
-if st.button("Get Advice"):
-    if query:
-        advice = fetch_agriculture_advice(query, client, location)
-        st.write(f"Expert Advice: {advice}")
-    else:
-        st.warning("Please enter a query.")
-
-# Achievement Badges
-st.subheader("Achievements")
-if health_percentage >= 75:
-    st.write("🏆 Achievement Unlocked: Green Thumb! 🎉")
+        if user_query:
+            if st.button("Get LLM Answer"):
+                llm_answer = fetch_llm_answer(user_query, client)
+                st.write(f"LLM Answer: {llm_answer}")
+            
+            if st.button("Get RAG-Enhanced Answer"):
+                df, index, model, _= load_knowledge_base_and_embeddings()
+                retrieved_docs = retrieve_documents(user_query, df, index, model)
+                rag_answer = fetch_rag_answer(user_query, client, retrieved_docs)
+                st.write(f"RAG-Enhanced Answer: {rag_answer}")
+                
+                llm_answer = fetch_llm_answer(user_query, client)
+                final_response = fusion_response(llm_answer, rag_answer)
+                st.write(f"Final Fusion Response:\n{final_response}")
